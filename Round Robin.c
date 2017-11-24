@@ -11,6 +11,7 @@
  * 		calculate waiting time, turnaround time (context switching)
  * 
  * - Sort based on arrival time
+ * - After completing burst time, remove from queue
  * 
  */
  
@@ -20,18 +21,19 @@ unsigned time_quantum;
 
 void delay(int ms);
 void read_csv();
-void enqueue(Queue *q, Process *processToBeAdded);
+void enqueue(Queue *q, Process *p);
 void dequeue(Queue *q);
 int check_current_size(Queue *q);
 void start_scheduler(Queue *q, unsigned *tq);
 int compute_burst_time(Process *p, unsigned *tq);
-Process *process_pids(unsigned *pids, unsigned *arrival, unsigned *burst);
+Process *process_pids(unsigned *pid, unsigned *arrival, unsigned *burst);
 
+//--------------------------------------------------------------------------------------------------
 /* Structures:
  * 	- Process
- * 	- Queue
- */
- 
+ * 	- Queue */
+//--------------------------------------------------------------------------------------------------
+
 typedef struct processes {
    unsigned pid;
    unsigned arrival_time;
@@ -48,19 +50,20 @@ typedef struct queue {
 } Queue;
 
 //--------------------------------------------------------------------------------------------------
-// Queue Methods
-// Not necessary
-Process *peek(Queue *queue) {
-    queue->front = 0;
-    return queue->arr[queue->front];
-}
+/* Queue methods
+ * - Check current size of queue
+ * - Enqueue
+ * - Dequeue
+ * - Get current state of queue */
+//--------------------------------------------------------------------------------------------------
 
-// @output: Returns amount of items currently in the ready_queue
+// This function returns amount of items currently in the ready queue
+// @returns queue size
 int check_current_size(Queue *queue) {
     return queue->size;
 }
 
-// Adds incoming processes or already processed process into queue
+// This functions adds incoming processes or already processed process into queue
 void enqueue(Queue *queue, Process *process) {
 	size_t size = sizeof(queue->arr)/sizeof(queue->arr[0]);
 	unsigned currentSize = check_current_size(queue);
@@ -74,16 +77,30 @@ void enqueue(Queue *queue, Process *process) {
    //printf("Pid: %d, Arr: %d Burs %d\n", process->pid, process->arrival_time, process->burst_time);
 }
 
-// Shift processes in array by 1 and move front process to the end
+// This functions either: 
+// Shift processes in array by 1 and move front process to the end if process is not null OR
+// Dequeues process if process' burst time is zero
 void dequeue(Queue *queue) {
 	queue->front = 0;
 	queue->rear = 3;
-	Process (*tempProcess) = queue->arr[queue->front]; 
+	Process *tempProcess = queue->arr[queue->front]; 
 	
-	for (size_t i = 1; i < (size_t) queue->size; i++) {
-		queue->arr[i-1] = queue->arr[i];
+	// Check if the process in front of the queue is not considered NULL
+	// Move front process to the end
+	if (tempProcess != NULL) {
+		for (size_t i = 1; i < (size_t) queue->size; i++) {
+			queue->arr[i-1] = queue->arr[i];
+		}
+		queue->arr[queue->rear] = tempProcess;
 	}
-	queue->arr[queue->rear] = tempProcess;
+	// Since it's null, dequeue it permanently
+	else {
+		for (size_t i = 0; i < (size_t) queue->size-1; i++) {
+			queue->arr[i] = queue->arr[i+1]; 
+		}
+		queue->size--;
+		printf("Process has been removed from queue");
+	}
 }
 
 // After the program runs for specified
@@ -92,25 +109,27 @@ void getCurrentState(Queue *queue) {
 	for (size_t i = 0; i < (size_t) queue->size; i++) {
 		printf("Process id#: %d | Arrival Time: %d | Burst Time %d\n", queue->arr[i]->pid, 
 		queue->arr[i]->arrival_time, queue->arr[i]->burst_time);
-		delay(2000);
+		delay(1000);
 	}
 }
 
 //--------------------------------------------------------------------------------------------------
 // Methods needed for starting Round Robin CPU Scheduling
 // Process the processes in the ready queue with specified time quantum, etc
+//--------------------------------------------------------------------------------------------------
+
 Process *process_pids(unsigned *p_id, unsigned *arrival, unsigned *burst) {
     Process *p;
     p = malloc(sizeof(Process));
     p->pid = *p_id;
     p->arrival_time = *arrival;
     p->burst_time = *burst;
-    //printf("%d %d %d\n", p->pid, p->arrival_time, p->burst_time);
     return p;
 }
 
 // Read csv file and check each character for an int. 
 // that int is then passed to the process in the queue array.
+// @input - file name
 void read_csv(Queue *ready_queue) {
 
     char c;
@@ -153,29 +172,43 @@ void read_csv(Queue *ready_queue) {
 	}
 }
 
+// Start RR
 void start_scheduler(Queue *ready_queue, unsigned *time_quantum) {
 	Process *newProcess = ready_queue->arr[ready_queue->front];
 	while (newProcess != NULL) {
 		if (newProcess->burst_time > 0) {
 			newProcess->burst_time = compute_burst_time(newProcess, time_quantum);
+			if (newProcess->burst_time == 0) {
+				newProcess = NULL;
+			}
+			printf("Process ran for time quantum of: %d\n", *time_quantum);
+			printf("Current size of queue is: %d\n",check_current_size(ready_queue));
 			getCurrentState(ready_queue);
 			dequeue(ready_queue);
+			
+			// Set the process equal to whatever is in front now
 			newProcess = ready_queue->arr[ready_queue->front];
+			printf("\n");
 			delay(1000);
 		}
+		/*
 		else {
 			newProcess = NULL;
 			ready_queue->size--;
-		}
+		}*/
 	}
 }
 
+// This function returns burst time after computing difference between process' burst time and the
+// time quantum itself
 int compute_burst_time(Process *p, unsigned *time_quantum) {
 	
 	for (size_t i = *time_quantum; i > 0; i--) {
-		p->burst_time -= 1;
-		printf("Burst time decremented\n");
-		delay(1000);
+		if (p->burst_time != 0) {
+			p->burst_time -= 1;
+			printf("Burst time decremented\n");
+			delay(1000);
+		}
 	}
 	return p->burst_time;
 	
@@ -193,12 +226,12 @@ void delay(int milliseconds)
         now = clock();
 }
 
+// Start
 int main() {
 	
-	// Originally Initialize Array to contain null values
+	// Originally initialize Array to contain null values
     Queue qtest = {NULL};
     
-    //printf("%d %d %d %d\n" , qtest.arr[0], qtest.arr[1], qtest.arr[2], qtest.arr[3]);
     read_csv(&qtest);
     printf("Enter the time quantum of your choice ");
     scanf("%d", &time_quantum);
@@ -212,11 +245,6 @@ int main() {
 		printf("Process id#: %d | Arrival Time: %d | Burst Time %d\n", qtest.arr[i]-> pid, 
 		qtest.arr[i] -> arrival_time, qtest.arr[i]->burst_time);
     }
-    
-    /*
-    printf("\n");
-    dequeue(&qtest);
-    getCurrentState(&qtest);*/
     
     printf("\n");
     
