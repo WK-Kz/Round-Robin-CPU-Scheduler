@@ -16,6 +16,7 @@ void dequeue(Queue *q, CPU *processor, time_t *exec_time);
 void getCurrentState(Queue *q);
 void start_scheduler(CPU *cpu, Queue *q, unsigned *tq);
 void calculate_process_info(Process *p, int *exec_time);
+void analysis(CPU *unit, Queue *ready_queue);
 
 double cpu_maximum_utilization(CPU *cpu);
 int check_current_size(Queue *q);
@@ -25,7 +26,8 @@ Process *process_pids(unsigned *pid, unsigned *arrival, unsigned *burst);
 //--------------------------------------------------------------------------------------------------
 /* Structures:
  * 	- Process
- * 	- Queue */
+ * 	- Queue
+ *  - CPU */
 //--------------------------------------------------------------------------------------------------
 
 typedef struct processes {
@@ -87,30 +89,30 @@ double cpu_maximum_utilization(CPU *unit) {
 
 // This function returns amount of items currently in the ready queue
 // @returns queue size
-int check_current_size(Queue *queue) {
-    return queue->current_size;
+int check_current_size(Queue *q) {
+    return q->current_size;
 }
 
 // This functions adds incoming processes or already processed process into queue
-void enqueue(Queue *queue, Process *process) {
-	size_t size = sizeof(queue->arr)/sizeof(queue->arr[0]);
-	unsigned currentSize = check_current_size(queue);
+void enqueue(Queue *q, Process *process) {
+	size_t size = sizeof(q->arr)/sizeof(q->arr[0]);
+	unsigned currentSize = check_current_size(q);
    
-	if (queue->arr[currentSize] == NULL && currentSize < size) {
-	   queue->arr[currentSize] = process;
-	   queue->current_size++;
+	if (q->arr[currentSize] == NULL && currentSize < size) {
+	   q->arr[currentSize] = process;
+	   q->current_size++;
 	}
-	queue->original_size = queue->current_size;
+	q->original_size = size;
 }
 
 // This function either: 
 // Shift processes in array by 1 and move front process to the end if process is not null OR
 // Dequeues process if process' burst time is zero
 // Problems: Does not make it null
-void dequeue(Queue *queue, CPU *processor, time_t *start_exec) {
-	queue->front = 0;
-	queue->rear = queue->current_size-1;
-	Process *tempProcess = queue->arr[queue->front]; 
+void dequeue(Queue *q, CPU *processor, time_t *start_exec) {
+	q->front = 0;
+	q->rear = q->current_size-1;
+	Process *tempProcess = q->arr[q->front]; 
 	time_t start, end;
 	
 	start = clock();
@@ -118,17 +120,17 @@ void dequeue(Queue *queue, CPU *processor, time_t *start_exec) {
 	// Check if the process in front of the queue is not considered NULL
 	// Move front process to the end
 	if (tempProcess != NULL) {
-		for (size_t i = 0; i < queue->current_size-1; i++) {
-			queue->arr[i] = queue->arr[i+1];
+		for (size_t i = 0; i < q->current_size-1; i++) {
+			q->arr[i] = q->arr[i+1];
 		}
-		queue->arr[queue->rear] = tempProcess;
+		q->arr[q->rear] = tempProcess;
 	}
 	// Since it's null, dequeue it permanently
 	else {
-		for (size_t i = 0; i < queue->current_size-1; i++) {
-			queue->arr[i] = queue->arr[i+1]; 
+		for (size_t i = 0; i < q->current_size-1; i++) {
+			q->arr[i] = q->arr[i+1]; 
 		}
-		queue->current_size--;
+		q->current_size--;
 		printf("Process has been removed from queue\n");
 	}
 	
@@ -280,7 +282,6 @@ void start_scheduler(CPU *processor, Queue *ready_queue, unsigned *time_quantum)
 			// Set the process equal to whatever is in front now
 			newProcess = ready_queue->arr[ready_queue->front];
 			printf("\n");
-			delay(1000);
 		}
 	}
 }
