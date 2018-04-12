@@ -9,11 +9,19 @@ into the queue.
 ## Assignment
 Create a CPU Scheduler from scratch that will read a csv and implement this algorithm.
 
-## Future:
-- Calculate waiting time, turnaround time (context switching)
-- Come up with final assessment of efficiency of the scheduler
-- Possible gui
+## Executing
 
-It is still a work in progress
+Change the arrival/burst time in the pid.csv file
+<br>
 
+Compile the program again if necessary.
+```
+g++ -o output Round_Robin.c
+```
+
+Execute
+
+```
+./output
+```
 
